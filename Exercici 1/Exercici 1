@@ -2,54 +2,60 @@
 #include <SPI.h>
 #include <SD.h>
 
-// Definim els pins de l'ESP32-S3 per al bus SPI
+// Pins exactes per al bus SPI2 de l'ESP32-S3 segons el teu document
 #define SCK_PIN 36
 #define MISO_PIN 37
 #define MOSI_PIN 35
-#define CS_PIN 4
+#define CS_PIN 39 
 
 File myFile;
 
 void setup() {
-  // L'ESP32 funciona millor a 115200 bauds (el document diu 9600, però millor ser ràpids)
   Serial.begin(115200); 
   
-  // Pausa de 3 segons per donar-te temps a obrir el Monitor Sèrie a PlatformIO
-  delay(3000); 
-
-  Serial.println("Iniciando SD ...");
-
-  // Obliguem a l'ESP32 a utilitzar els nostres pins per al bus SPI
-  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CS_PIN);
-
-  // Inicialitzem la targeta SD apuntant al pin CS
-  if (!SD.begin(CS_PIN)) {
-    Serial.println("No se pudo inicializar la SD. Comprova els cables!");
-    return; // Si falla, s'atura aquí
+  // Aquest bucle fa que la placa t'esperi pacientment. 
+  // No avançarà fins que no obris el Monitor Sèrie!
+  while (!Serial) {
+    delay(10);
   }
   
-  Serial.println("Inicializacion exitosa!");
+  // Un cop obert el terminal, fem un delay de cortesia
+  delay(1000);
 
-  // Obrim el fitxer (és recomanable posar la barra '/' al davant)
+  Serial.println("\n--- Iniciant prova de SD ---");
+
+  // 1. Inicialitzem el bus SPI amb els nostres pins
+  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CS_PIN);
+
+  // 2. Inicialitzem la SD indicant-li quin CS i quin bus SPI ha d'utilitzar!
+  if (!SD.begin(CS_PIN, SPI)) {
+    Serial.println("❌ Error: No se pudo inicializar la SD.");
+    Serial.println("Comprova els cables o si la targeta esta ben ficada.");
+    return; // Ens aturem aquí
+  }
+  
+  Serial.println("✅ Inicializacion exitosa!");
+
+  // Obrim el fitxer (recorda tenir archivo.txt creat a la targeta)
   myFile = SD.open("/archivo.txt"); 
   
   if (myFile) {
-    Serial.println("Contingut de archivo.txt:");
+    Serial.println("📄 Contingut de archivo.txt:");
+    Serial.println("---------------------------");
     
-    // Llegim el fitxer caràcter a caràcter fins al final
     while (myFile.available()) {
       Serial.write(myFile.read());
     }
     
-    // Tanquem el fitxer
     myFile.close(); 
-    Serial.println("\n--- Fi de la lectura ---");
+    Serial.println("\n---------------------------");
+    Serial.println("Fi de la lectura");
     
   } else {
-    Serial.println("Error al abrir el archivo. Existeix archivo.txt?");
+    Serial.println("❌ Error al abrir el archivo. Existeix 'archivo.txt'?");
   }
 }
 
 void loop() {
-  // Buit, només ho volem llegir una vegada en arrencar
+  // Buit
 }
