@@ -1,1 +1,53 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <MFRC522.h>
 
+// Definim els pins del bus SPI per a l'ESP32-S3
+#define SCK_PIN 36
+#define MISO_PIN 37
+#define MOSI_PIN 35
+
+// Pins de control del mòdul RFID
+#define RST_PIN 9   // Pin 9 para el reset del RC522 
+#define SS_PIN 10   // Pin 10 para el SS (SDA) del RC522 
+
+// Creamos el objeto para el RC522 [cite: 1258]
+MFRC522 mfrc522(SS_PIN, RST_PIN); 
+
+void setup() {
+  Serial.begin(115200); 
+  
+  while (!Serial) { delay(10); } // Esperem que s'obri el terminal
+  delay(1000);
+
+  // Iniciamos el Bus SPI amb els nostres pins
+  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
+  
+  // Iniciamos el MFRC522 [cite: 1264, 1265]
+  mfrc522.PCD_Init(); 
+  
+  Serial.println("Lectura del UID preparada."); [cite: 1267]
+  Serial.println("Apropa una targeta o clauer al lector...");
+}
+
+void loop() {
+  // Revisamos si hay nuevas tarjetas presentes [cite: 1269, 1270]
+  if (mfrc522.PICC_IsNewCardPresent()) {
+    
+    // Seleccionamos una tarjeta [cite: 1272, 1273]
+    if (mfrc522.PICC_ReadCardSerial()) {
+      
+      // Enviamos serialemente su UID [cite: 1275, 1276]
+      Serial.print("Card UID:");
+      
+      for (byte i = 0; i < mfrc522.uid.size; i++) { [cite: 1277]
+        Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "); [cite: 1288]
+        Serial.print(mfrc522.uid.uidByte[i], HEX); [cite: 1289]
+      }
+      Serial.println(); [cite: 1290]
+      
+      // Terminamos la lectura de la tarjeta actual [cite: 1291]
+      mfrc522.PICC_HaltA(); 
+    }
+  }
+}
