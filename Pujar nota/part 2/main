@@ -1,0 +1,78 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <SD.h>
+#include <MFRC522.h>
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
+
+// --- LES TEVES CREDENCIALS ---
+const char* ssid = "NOM_DEL_WIFI";
+const char* password = "CONTRASENYA";
+
+// --- ELS TEUS PINS ---
+#define SD_CS 39
+#define SD_MOSI 35
+#define SD_SCK 36
+#define SD_MISO 37
+#define RFID_RST 9
+#define RFID_MISO 13
+#define RFID_MOSI 11
+#define RFID_SCK 12
+#define RFID_CS 10
+
+SPIClass spiSD(HSPI);
+MFRC522 mfrc522(RFID_CS, RFID_RST);
+AsyncWebServer server(80);
+
+void setup() {
+  Serial.begin(115200);
+  
+  // 1. Connexió Wi-Fi 
+  WiFi.begin(ssid, password);
+  Serial.print("Connectant al Wi-Fi...");
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.println("\n✅ Connectat! IP: " + WiFi.localIP().toString());
+
+  // 2. Inici Bus 1 (RFID) [cite: 233, 262]
+  SPI.begin(RFID_SCK, RFID_MISO, RFID_MOSI, RFID_CS);
+  mfrc522.PCD_Init();
+
+  // 3. Inici Bus 2 (SD)
+  spiSD.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
+  if (!SD.begin(SD_CS, spiSD)) Serial.println("❌ ERROR SD");
+
+  // 4. Ruta del Servidor Web
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    File file = SD.open("/fichero.log");
+    if (file) {
+      request->send(SD, "/fichero.log", "text/plain");
+      file.close();
+    } else {
+      request->send(200, "text/plain", "Encara no hi ha dades al log.");
+    }
+  });
+
+  server.begin();
+  Serial.println("🌐 Servidor Web actiu!");
+}
+
+void loop() {
+  if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+    String uid = "";
+    for (byte i = 0; i < mfrc522.uid.size; i++) {
+      uid += String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+      uid += String(mfrc522.uid.uidByte[i], HEX);
+    }
+    uid.toUpperCase();
+    
+    String registre = "Temps: " + String(millis()/1000) + "s | Codi:" + uid;
+    File myFile = SD.open("/fichero.log", FILE_APPEND);
+    if (myFile) {
+      myFile.println(registre);
+      myFile.close();
+      Serial.println("💾 Registrat: " + registre);
+    }
+    mfrc522.PICC_HaltA();
+    delay(1000);
+  }
+}
